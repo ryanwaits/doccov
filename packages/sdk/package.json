@@ -73,8 +73,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@openpkg-ts/sdk": "^0.43.0",
-    "@openpkg-ts/spec": "^0.43.0",
+    "@openpkg-ts/sdk": "^0.51.0",
+    "@openpkg-ts/spec": "^0.50.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "remark-mdx": "^3.1.0",
