@@ -9,6 +9,7 @@ export type {
   CoverageConfig,
   DocsConfig,
   DriftConfig,
+  ExamplesConfig,
   ExampleValidationMode,
   RemoteDocsTarget,
 } from './types';

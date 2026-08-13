@@ -331,7 +331,9 @@ Validate `@example` blocks on exports.
 | Flag | Type | Description |
 |------|------|-------------|
 | `--typecheck` | boolean | Type-check examples with TypeScript |
-| `--run` | boolean | Execute examples at runtime (implies `--typecheck`) |
+| `--run` | boolean | Execute examples that contain `// =>` assertions (implies `--typecheck`). Installs the package with lifecycle scripts disabled. Own-package / CI is unsandboxed. Packages outside the workspace require OS isolation (`sandbox-exec` on macOS; other platforms refuse). |
+| `--yes` | boolean | Confirm `--run`. Required when not a TTY unless `examples.run` is set in config. |
+| `--untrusted` | boolean | Treat the target as a third-party package (force OS isolation). |
 | `--all` | boolean | Run across all workspace packages |
 | `--private` | boolean | Include private packages in `--all` mode |
 | `--min <n>` | number | Minimum example presence threshold (exit 1 if below) |

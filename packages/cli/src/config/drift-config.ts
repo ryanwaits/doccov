@@ -29,6 +29,11 @@ export interface DriftConfig {
     /** Remote repos to sync docs on breaking changes */
     remote?: RemoteDocsTarget[];
   };
+  /** Example execution policy */
+  examples?: {
+    /** Allow --run in non-TTY (CI) without --yes */
+    run?: boolean;
+  };
 }
 
 const DEFAULTS: DriftConfig = {
@@ -113,6 +118,17 @@ export function validateConfig(
             }
           }
         }
+      }
+    }
+  }
+
+  if (obj.examples !== undefined) {
+    if (typeof obj.examples !== 'object' || obj.examples === null) {
+      errors.push('"examples" must be an object');
+    } else {
+      const examples = obj.examples as Record<string, unknown>;
+      if (examples.run !== undefined && typeof examples.run !== 'boolean') {
+        errors.push('"examples.run" must be a boolean');
       }
     }
   }

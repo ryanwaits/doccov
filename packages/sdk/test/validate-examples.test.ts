@@ -228,6 +228,7 @@ describe('validateExamples', () => {
       expect(result.run).toBeDefined();
       expect(result.run!.passed).toBe(0);
       expect(result.run!.failed).toBe(0);
+      expect(result.run!.skipped).toBe(0);
       expect(result.run!.drifts).toHaveLength(0);
       expect(result.run!.installSuccess).toBe(true);
     });

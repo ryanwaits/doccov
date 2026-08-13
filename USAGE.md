@@ -96,7 +96,9 @@ drift examples [entry] [options]
 
 Options:
 - `--typecheck` — Type-check examples
-- `--run` — Execute examples in sandbox
+- `--run` — Execute examples that contain `// =>` assertions (installs the package; lifecycle scripts disabled)
+- `--yes` — Confirm `--run` (required when not a TTY; or set `examples.run` in config)
+- `--untrusted` — Treat the target as a third-party package (OS isolation; macOS only)
 - `--min <n>` — Minimum example coverage %
 - `--all` — Run across all workspace packages
 - `--private` — Include private packages

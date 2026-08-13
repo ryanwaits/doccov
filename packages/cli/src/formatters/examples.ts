@@ -57,18 +57,19 @@ export function renderExamples(data: ExampleValidationResult): string {
 
   // Runtime section
   if (data.run) {
-    const { passed, failed, drifts, installSuccess, installError } = data.run;
+    const { passed, failed, skipped, drifts, installSuccess, installError } = data.run;
 
     if (!installSuccess) {
-      lines.push(indent(`${c.gray('RUNTIME')}  ${c.red('install failed')}`));
+      lines.push(indent(`${c.gray('RUNTIME')}  ${c.red('failed')}`));
       if (installError) {
         lines.push(indent(`  ${c.red(installError)}`));
       }
     } else {
+      const skipBit = skipped > 0 ? `  ${c.gray(`${skipped} skipped`)}` : '';
       const status =
         failed === 0
-          ? c.green(`${passed} passed`)
-          : `${c.green(`${passed} passed`)}  ${c.red(`${failed} failed`)}`;
+          ? `${c.green(`${passed} passed`)}${skipBit}`
+          : `${c.green(`${passed} passed`)}  ${c.red(`${failed} failed`)}${skipBit}`;
       lines.push(indent(`${c.gray('RUNTIME')}  ${status}`));
 
       if (drifts.length > 0) {
@@ -90,7 +91,9 @@ export function renderExamples(data: ExampleValidationResult): string {
   if (!ran.includes('typecheck') && !ran.includes('run')) {
     lines.push(indent(c.gray('Tip: drift examples --typecheck to compile-check examples')));
   } else if (!ran.includes('run')) {
-    lines.push(indent(c.gray('Tip: drift examples --run to execute examples at runtime')));
+    lines.push(
+      indent(c.gray('Tip: drift examples --run to execute examples with // => assertions')),
+    );
   }
   lines.push('');
 

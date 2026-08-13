@@ -48,6 +48,17 @@ describe('config validation', () => {
     expect(config.lint).toBe(false);
     expect(config.coverage?.min).toBe(50);
   });
+
+  test('examples.run boolean is valid', () => {
+    const result = validateConfig({ examples: { run: true } });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.config.examples?.run).toBe(true);
+  });
+
+  test('examples.run non-boolean is invalid', () => {
+    const result = validateConfig({ examples: { run: 'yes' } });
+    expect(result.ok).toBe(false);
+  });
 });
 
 // --- Ratcheting ---

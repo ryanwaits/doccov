@@ -30,7 +30,12 @@ export function registerExamplesCommand(program: Command): void {
     .command('examples [entry]')
     .description('Validate @example blocks on exports')
     .option('--typecheck', 'Type-check examples with TypeScript')
-    .option('--run', 'Execute examples at runtime (implies --typecheck)')
+    .option(
+      '--run',
+      'Execute examples that contain // => assertions (implies --typecheck; installs the package)',
+    )
+    .option('--yes', 'Confirm execution (required when not a TTY)')
+    .option('--untrusted', 'Treat the target as a third-party package (OS isolation; macOS only)')
     .option('--all', 'Run across all workspace packages')
     .option('--private', 'Include private packages in --all mode')
     .option('--min <n>', 'Minimum presence threshold (exit 1 if below)')
@@ -40,6 +45,8 @@ export function registerExamplesCommand(program: Command): void {
         options: {
           typecheck?: boolean;
           run?: boolean;
+          yes?: boolean;
+          untrusted?: boolean;
           all?: boolean;
           private?: boolean;
           min?: string;
@@ -54,11 +61,19 @@ export function registerExamplesCommand(program: Command): void {
           if (options.typecheck || options.run) validations.push('typecheck');
           if (options.run) validations.push('run');
 
-          // --run warning
+          const { config } = loadConfig();
           if (options.run) {
-            process.stderr.write(
-              '\u26a0 --run executes code from @example blocks. Only use on trusted code.\n',
-            );
+            const confirmed =
+              Boolean(options.yes) || config.examples?.run === true || Boolean(process.stdin.isTTY);
+            if (!confirmed) {
+              formatError(
+                'examples',
+                '--run requires --yes or examples.run: true in config when not running interactively',
+                startTime,
+                version,
+              );
+              return;
+            }
           }
 
           // --all batch mode
@@ -91,6 +106,7 @@ export function registerExamplesCommand(program: Command): void {
                 validations,
                 packagePath,
                 exportNames,
+                untrusted: options.untrusted,
               });
 
               const withEx = result.presence?.withExamples ?? 0;
@@ -101,7 +117,9 @@ export function registerExamplesCommand(program: Command): void {
               totalAll += total;
 
               if (result.typecheck && result.typecheck.failed > 0) hasFailures = true;
-              if (result.run && result.run.failed > 0) hasFailures = true;
+              if (result.run && (result.run.failed > 0 || !result.run.installSuccess)) {
+                hasFailures = true;
+              }
             }
 
             const aggScore = totalAll > 0 ? Math.round((totalWith / totalAll) * 100) : 100;
@@ -119,7 +137,6 @@ export function registerExamplesCommand(program: Command): void {
           }
 
           // Single package mode
-          const { config } = loadConfig();
           const entryFile = entry
             ? path.resolve(process.cwd(), entry)
             : config.entry
@@ -135,6 +152,7 @@ export function registerExamplesCommand(program: Command): void {
             validations,
             packagePath,
             exportNames,
+            untrusted: options.untrusted,
           });
 
           const missingCount = result.presence?.missing?.length ?? 0;
@@ -160,7 +178,9 @@ export function registerExamplesCommand(program: Command): void {
             if (score < minThreshold) process.exitCode = 1;
           }
           if (result.typecheck && result.typecheck.failed > 0) process.exitCode = 1;
-          if (result.run && result.run.failed > 0) process.exitCode = 1;
+          if (result.run && (result.run.failed > 0 || !result.run.installSuccess)) {
+            process.exitCode = 1;
+          }
         } catch (err) {
           formatError(
             'examples',

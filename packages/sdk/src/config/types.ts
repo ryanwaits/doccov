@@ -43,6 +43,14 @@ export interface CoverageConfig {
 export type ExampleValidationMode = 'presence' | 'typecheck' | 'run';
 
 /**
+ * Example execution policy.
+ */
+export interface ExamplesConfig {
+  /** Allow --run in non-TTY (CI) without --yes */
+  run?: boolean;
+}
+
+/**
  * Normalized Drift configuration.
  */
 export interface DriftConfig {
@@ -58,6 +66,8 @@ export interface DriftConfig {
   lint?: boolean;
   /** Documentation configuration */
   docs?: DocsConfig;
+  /** Example execution policy */
+  examples?: ExamplesConfig;
 }
 
 /**

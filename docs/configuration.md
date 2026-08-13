@@ -88,6 +88,7 @@ A JSON Schema ships with the CLI (`@driftdev/cli/schemas/drift.config.schema.jso
 | `lint` | `boolean` | `true` | Enable lint checks |
 | `docs.include` | `string[]` | `["README.md", "docs/**/*.md", "docs/**/*.mdx"]` | Glob patterns for markdown discovery (prose drift) |
 | `docs.exclude` | `string[]` | `["node_modules/**", "dist/**", ".git/**"]` | Glob patterns to exclude from markdown discovery |
+| `examples.run` | `boolean` | `false` | Allow `drift examples --run` in non-TTY (CI) without `--yes` |
 
 ## Managing Config with `drift config`
 

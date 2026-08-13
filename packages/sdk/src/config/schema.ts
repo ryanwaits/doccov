@@ -4,7 +4,7 @@
  * @driftdev/cli) — one config format, validated the same everywhere.
  */
 import { z } from 'zod';
-import type { DocsConfig, DriftConfig } from './types';
+import type { DocsConfig, DriftConfig, ExamplesConfig } from './types';
 
 const stringList: z.ZodUnion<[z.ZodString, z.ZodArray<z.ZodString>]> = z.union([
   z.string(),
@@ -47,6 +47,13 @@ const coverageConfigSchema: z.ZodObject<{
   ratchet: z.boolean().optional(),
 });
 
+const examplesConfigSchema: z.ZodObject<{
+  run: z.ZodOptional<z.ZodBoolean>;
+}> = z.object({
+  /** Allow --run in non-TTY (CI) without --yes */
+  run: z.boolean().optional(),
+});
+
 export const driftConfigSchema: z.ZodObject<{
   $schema: z.ZodOptional<z.ZodString>;
   entry: z.ZodOptional<z.ZodString>;
@@ -55,6 +62,7 @@ export const driftConfigSchema: z.ZodObject<{
   coverage: z.ZodOptional<typeof coverageConfigSchema>;
   lint: z.ZodOptional<z.ZodBoolean>;
   docs: z.ZodOptional<typeof docsConfigSchema>;
+  examples: z.ZodOptional<typeof examplesConfigSchema>;
 }> = z.object({
   /** Editor/agent affordance — path or URL of drift.config.schema.json */
   $schema: z.string().optional(),
@@ -68,6 +76,8 @@ export const driftConfigSchema: z.ZodObject<{
   lint: z.boolean().optional(),
   /** Markdown documentation configuration */
   docs: docsConfigSchema.optional(),
+  /** Example execution policy */
+  examples: examplesConfigSchema.optional(),
 });
 
 export type DriftConfigInput = z.infer<typeof driftConfigSchema>;
@@ -100,6 +110,11 @@ export const normalizeConfig = (input: DriftConfigInput): DriftConfig => {
     }
   }
 
+  let examples: ExamplesConfig | undefined;
+  if (input.examples && input.examples.run !== undefined) {
+    examples = { run: input.examples.run };
+  }
+
   return {
     entry: input.entry,
     include,
@@ -107,5 +122,6 @@ export const normalizeConfig = (input: DriftConfigInput): DriftConfig => {
     coverage: input.coverage,
     lint: input.lint,
     docs,
+    examples,
   };
 };

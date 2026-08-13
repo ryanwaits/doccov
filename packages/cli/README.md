@@ -158,7 +158,7 @@ Validate @example blocks.
 ```bash
 drift examples                # presence check
 drift examples --typecheck    # type-check examples
-drift examples --run          # execute examples
+drift examples --run          # execute examples with // => assertions
 drift examples --min 50       # fail if example coverage below 50%
 ```
 

@@ -79,6 +79,17 @@
         }
       },
       "additionalProperties": false
+    },
+    "examples": {
+      "type": "object",
+      "description": "Example execution policy",
+      "properties": {
+        "run": {
+          "type": "boolean",
+          "description": "Allow --run in non-TTY (CI) without --yes"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": true

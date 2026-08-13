@@ -149,6 +149,7 @@ export type {
   DocsConfig,
   DriftConfig,
   DriftConfigInput,
+  ExamplesConfig,
   RemoteDocsTarget,
 } from './config';
 export { defineConfig, driftConfigSchema, normalizeConfig } from './config';

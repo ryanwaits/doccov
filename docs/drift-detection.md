@@ -60,7 +60,7 @@ Issues with `@example` code blocks.
 |------------|-------------|
 | `example-drift` | Example imports or references non-existent exports |
 | `example-syntax-error` | Example has syntax errors |
-| `example-runtime-error` | Example throws at runtime (requires `--run`) |
+| `example-runtime-error` | Example throws at runtime (requires `--run`; only examples with `// =>` assertions execute) |
 | `example-assertion-failed` | Example assertion comment doesn't match actual output (requires `--run`) |
 
 ### Prose

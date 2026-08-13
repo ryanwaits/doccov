@@ -32,7 +32,7 @@ export const VALIDATION_INFO: Record<
   },
   run: {
     label: 'Run',
-    description: 'Execute examples and validate // => assertions',
+    description: 'Execute examples that contain // => assertions',
   },
 };
 

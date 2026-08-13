@@ -31,6 +31,15 @@ export interface ExampleValidationOptions {
   timeout?: number;
   /** Timeout for package installation (ms) */
   installTimeout?: number;
+  /** Package manager override for the install step */
+  packageManager?: 'npm' | 'pnpm' | 'bun' | 'yarn';
+  /**
+   * Treat the target as third-party (OS isolation required).
+   * Default: auto — local workspace is trusted, anything else is not.
+   */
+  untrusted?: boolean;
+  /** Working directory used to decide workspace-local vs third-party */
+  cwd?: string;
   /** Callback for LLM assertion parsing fallback */
   llmAssertionParser?: (
     example: string,
@@ -87,6 +96,8 @@ export interface RuntimeDrift {
 export interface RunValidationResult {
   passed: number;
   failed: number;
+  /** Examples with no // => assertion — type-checked, not executed */
+  skipped: number;
   drifts: RuntimeDrift[];
   installSuccess: boolean;
   installError?: string;
@@ -130,7 +141,7 @@ function getStringExamples(exp: ApiExport): string[] {
  * Runs only the validations specified. Each validation is independent:
  * - `presence`: checks examples exist (doesn't require typecheck or run)
  * - `typecheck`: type-checks examples (doesn't require presence or run)
- * - `run`: executes examples (doesn't require presence or typecheck)
+ * - `run`: executes examples that contain // => assertions (Go polarity)
  */
 export async function validateExamples(
   exports: ApiExport[],
@@ -215,15 +226,21 @@ export async function validateExamples(
   }
 
   // === Run validation ===
+  // Go polarity: examples without // => assertions are type-checked (above)
+  // but not executed. Execution is opt-in via the assertion itself.
   if (shouldValidate(validations, 'run')) {
     const runtimeDrifts: RuntimeDrift[] = [];
+    const runnable: Array<{ exportName: string; exampleIndex: number; code: string }> = [];
+    let skipped = 0;
 
-    // Collect all examples from all exports
-    const allExamples: Array<{ exportName: string; examples: string[] }> = [];
     for (const exp of exports) {
       const examples = getStringExamples(exp);
-      if (examples.length > 0) {
-        allExamples.push({ exportName: exp.name, examples });
+      for (let i = 0; i < examples.length; i++) {
+        if (parseAssertions(examples[i]).length > 0) {
+          runnable.push({ exportName: exp.name, exampleIndex: i, code: examples[i] });
+        } else if (examples[i].trim()) {
+          skipped++;
+        }
       }
     }
 
@@ -232,100 +249,100 @@ export async function validateExamples(
     let installSuccess = true;
     let installError: string | undefined;
 
-    if (allExamples.length > 0) {
-      // Flatten examples for batch execution
-      const flatExamples = allExamples.flatMap((e) => e.examples);
+    if (runnable.length > 0) {
+      process.stderr.write(
+        '\u26a0 run installs the package (lifecycle scripts disabled) and executes @example blocks that contain // => assertions.\n',
+      );
 
-      // Run all examples with package installed
-      const packageResult = await runExamplesWithPackage(flatExamples, {
-        packagePath,
-        timeout,
-        installTimeout,
-        cwd: packagePath,
-      });
+      const packageResult = await runExamplesWithPackage(
+        runnable.map((r) => r.code),
+        {
+          packagePath,
+          timeout,
+          installTimeout,
+          cwd: options.cwd ?? packagePath,
+          untrusted: options.untrusted,
+          packageManager: options.packageManager,
+        },
+      );
 
       installSuccess = packageResult.installSuccess;
       installError = packageResult.installError;
 
       if (packageResult.installSuccess) {
-        let exampleIndex = 0;
+        const byExport = new Map<string, Map<number, ExampleRunResult>>();
 
-        // Map results back to exports
-        for (const { exportName, examples } of allExamples) {
-          const entryResults = new Map<number, ExampleRunResult>();
+        for (let i = 0; i < runnable.length; i++) {
+          const res = packageResult.results.get(i);
+          if (!res) continue;
+          if (res.success) {
+            passed++;
+          } else {
+            failed++;
+          }
+          const item = runnable[i];
+          let bucket = byExport.get(item.exportName);
+          if (!bucket) {
+            bucket = new Map();
+            byExport.set(item.exportName, bucket);
+          }
+          bucket.set(item.exampleIndex, res);
+        }
 
-          for (let i = 0; i < examples.length; i++) {
-            const res = packageResult.results.get(exampleIndex);
-            if (res) {
-              if (res.success) {
-                passed++;
-              } else {
-                failed++;
-              }
-              entryResults.set(i, res);
-            }
-            exampleIndex++;
+        for (const [exportName, entryResults] of byExport) {
+          const entry = exports.find((e) => e.name === exportName);
+          if (!entry) continue;
+
+          const runtimeErrorDrifts = detectExampleRuntimeErrors(entry, entryResults);
+          for (const drift of runtimeErrorDrifts) {
+            runtimeDrifts.push({
+              exportName: entry.name,
+              issue: drift.issue,
+              suggestion: drift.suggestion,
+            });
           }
 
-          // Find the export entry for drift detection
-          const entry = exports.find((e) => e.name === exportName);
-          if (entry) {
-            // Detect runtime errors
-            const runtimeErrorDrifts = detectExampleRuntimeErrors(entry, entryResults);
-            for (const drift of runtimeErrorDrifts) {
-              runtimeDrifts.push({
-                exportName: entry.name,
-                issue: drift.issue,
-                suggestion: drift.suggestion,
-              });
-            }
+          const assertionDrifts = detectExampleAssertionFailures(entry, entryResults);
+          for (const drift of assertionDrifts) {
+            runtimeDrifts.push({
+              exportName: entry.name,
+              issue: drift.issue,
+              suggestion: drift.suggestion,
+            });
+          }
 
-            // Detect assertion failures
-            const assertionDrifts = detectExampleAssertionFailures(entry, entryResults);
-            for (const drift of assertionDrifts) {
-              runtimeDrifts.push({
-                exportName: entry.name,
-                issue: drift.issue,
-                suggestion: drift.suggestion,
-              });
-            }
+          // LLM fallback only applies to examples that already ran (have // =>).
+          if (options.llmAssertionParser && entry.examples) {
+            for (let exIdx = 0; exIdx < entry.examples.length; exIdx++) {
+              const example = entry.examples[exIdx];
+              const res = entryResults.get(exIdx);
+              if (!res?.success || typeof example !== 'string') continue;
 
-            // LLM fallback: if no standard assertions but comments exist
-            if (options.llmAssertionParser && entry.examples) {
-              for (let exIdx = 0; exIdx < entry.examples.length; exIdx++) {
-                const example = entry.examples[exIdx];
-                const res = entryResults.get(exIdx);
-                if (!res?.success || typeof example !== 'string') continue;
+              const regexAssertions = parseAssertions(example);
+              if (regexAssertions.length === 0 && hasNonAssertionComments(example)) {
+                const llmResult = await options.llmAssertionParser(example);
+                if (llmResult?.hasAssertions && llmResult.assertions.length > 0) {
+                  const stdoutLines = res.stdout
+                    .split('\n')
+                    .map((l) => l.trim())
+                    .filter((l) => l.length > 0);
 
-                // Check if regex found no assertions but comments exist
-                const regexAssertions = parseAssertions(example);
-                if (regexAssertions.length === 0 && hasNonAssertionComments(example)) {
-                  // Try LLM fallback
-                  const llmResult = await options.llmAssertionParser(example);
-                  if (llmResult?.hasAssertions && llmResult.assertions.length > 0) {
-                    // Validate LLM-extracted assertions against stdout
-                    const stdoutLines = res.stdout
-                      .split('\n')
-                      .map((l) => l.trim())
-                      .filter((l) => l.length > 0);
+                  for (let aIdx = 0; aIdx < llmResult.assertions.length; aIdx++) {
+                    const assertion = llmResult.assertions[aIdx];
+                    const actual = stdoutLines[aIdx];
 
-                    for (let aIdx = 0; aIdx < llmResult.assertions.length; aIdx++) {
-                      const assertion = llmResult.assertions[aIdx];
-                      const actual = stdoutLines[aIdx];
-
-                      if (actual === undefined) {
-                        runtimeDrifts.push({
-                          exportName: entry.name,
-                          issue: `Assertion expected "${assertion.expected}" but no output was produced`,
-                          suggestion: `Consider using standard syntax: ${assertion.suggestedSyntax}`,
-                        });
-                      } else if (assertion.expected.trim() !== actual.trim()) {
-                        runtimeDrifts.push({
-                          exportName: entry.name,
-                          issue: `Assertion failed: expected "${assertion.expected}" but got "${actual}"`,
-                          suggestion: `Consider using standard syntax: ${assertion.suggestedSyntax}`,
-                        });
-                      }
+                    if (actual === undefined) {
+                      runtimeDrifts.push({
+                        exportName: entry.name,
+                        issue: `Assertion expected "${assertion.expected}" but no output was produced`,
+                        suggestion: `Consider using standard syntax: ${assertion.suggestedSyntax}`,
+                      });
+                    } else if (assertion.expected.trim() !== actual.trim()) {
+                      runtimeDrifts.push({
+                        exportName: entry.name,
+                        issue: `Assertion failed: expected "${assertion.expected}" but got "${actual}"`,
+                        suggestion: `Consider using standard syntax: ${assertion.suggestedSyntax}`,
+                      });
                     }
                   }
                 }
@@ -339,6 +356,7 @@ export async function validateExamples(
     result.run = {
       passed,
       failed,
+      skipped,
       drifts: runtimeDrifts,
       installSuccess,
       installError,
