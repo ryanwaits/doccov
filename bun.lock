@@ -73,14 +73,14 @@
     },
     "packages/cli": {
       "name": "@driftdev/cli",
-      "version": "1.13.0",
+      "version": "1.14.0",
       "bin": {
         "drift": "./dist/drift.js",
       },
       "dependencies": {
         "@driftdev/clarity-adapter": "^1.0.1",
         "@driftdev/openapi-adapter": "^1.0.1",
-        "@driftdev/sdk": "^1.13.0",
+        "@driftdev/sdk": "^1.14.0",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@openpkg-ts/sdk": "^0.51.0",
         "@openpkg-ts/spec": "^0.50.0",
@@ -104,7 +104,7 @@
     },
     "packages/sdk": {
       "name": "@driftdev/sdk",
-      "version": "1.13.0",
+      "version": "1.14.0",
       "dependencies": {
         "@openpkg-ts/sdk": "^0.51.0",
         "@openpkg-ts/spec": "^0.50.0",
